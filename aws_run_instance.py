@@ -11,6 +11,7 @@ instance_type = 't2.micro'
 ec2 = boto3.resource('ec2')
 
 def createvm(credentials):
+    data = {}
     instance_id = ec2.create_instances(
                         ImageId = ami_id,
                         MinCount = 1,
@@ -21,20 +22,22 @@ def createvm(credentials):
 
     instance = ec2.Instance(instance_id)
     instance.wait_until_running()
-
-    return json.dumps({'instance_id': instance_id, 'instance_ip': instance.public_ip_address}), 201
+    data['instance_id'] = instance_id
+    data['instance_ip'] = instance.public_ip_address
+    return data
 
 app = Flask(__name__)
 
 @app.route('/createvm', methods=['POST'])
-def create_vm():
+def main():
     if not request.json or not 'username' in request.json or not 'password' in request.json:
         abort(400)
     credentials = {
         'username': request.json['username'],
         'password': request.json['password'],
     }
-    return createvm(credentials)
+    vm = createvm(credentials)
+    return json.dumps(vm)
 
 if __name__ == "__main__":
     app.run(port=port, debug=True)
