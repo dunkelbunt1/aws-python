@@ -1,36 +1,40 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
-from flask import Flask
-from flask import request
-import json 
-import boto3
+from flask import Flask, request
+import json, boto3
+
+port = 8080
+ami_id = 'ami-3e713f4d'
+ec2 = boto3.resource('ec2')
 
 app = Flask(__name__)
-
 @app.route('/')
-
+@app.route('/index')
 def index():
-    return "Hello world"
+    return "Hello, World!"
 
 @app.route('/createvm', methods=['POST'])
-
-def hello():
-    if not request.json or not 'username' in request.json:
+def create_vm():
+    if not request.json or not 'username' in request.json or not 'password' in request.json:
         abort(400)
+
     credentials = {
         'username': request.json['username'],
-        'password': request.json['password'],
+        'password': request.json.get('password'),
     }
-    ec2 = boto3.resource('ec2')
-    instance = ec2.create_instances(
-	ImageId='ami-3e713f4d',
-	MinCount=1, 
-	MaxCount=1,
-        KeyName='KeyName',
-	InstanceType = 't2.micro',
-    )
 
-    return json.dumps({'instance_id': instance[0].id}), 201
+    instance_id = ec2.create_instances(
+                        ImageId = ami_id,
+                        MinCount = 1,
+                        MaxCount = 1,
+                        KeyName = 'bogdan',
+                        InstanceType = 't2.micro',
+                    )[0].id
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8080, debug=True) 
+    instance = ec2.Instance(instance_id)
+    instance.wait_until_running()
+
+    return json.dumps({'instance_id': instance_id, 'instance_ip': instance.public_ip_address}), 201
+
+if __name__ == "__main__":
+    app.run(port=port, debug=True)
