@@ -4,6 +4,7 @@ import time
 from flask import Flask, request
 import json, boto3
 import paramiko
+import crypt
 
 port = 8080
 ami_id = 'ami-3e713f4d'
@@ -28,17 +29,26 @@ def createvm(credentials):
     data['instance_ip'] = instance.public_ip_address
     return data
 
+def adduser(connection,username,password,sudo=False):
+    shadow_password = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
+    print("Adding user...")
+    command = "sudo useradd -m " + username + " -p " + shadow_password
+    return connection.exec_command(command)
+
 def connect(host):
     i = 0
     key = paramiko.RSAKey.from_private_key_file("/Users/bodzilla/.ssh/bogdan.pem")
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    
     while True:
-        print("Trying to connect to {} ({}/30)".format(host, i))
+        print("Trying to connect to {} ({})".format(host, i))
 
         try:
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(hostname = host, username = ubuntu, pkey = key)
+            ssh.connect(hostname = host, username = 'ubuntu', pkey = key)
             print("Connected to {}".format(host))
+            print("Create a user ...".format(host))
+            adduser(ssh, "x1", "xyz123x", sudo=False)
             break
         except paramiko.AuthenticationException:
             print("Authentication failed when connecting to {}".format(host))
