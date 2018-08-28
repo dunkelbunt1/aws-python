@@ -37,7 +37,7 @@ def adduser(connection,username,password,sudo=False):
 
 def connect(host):
     i = 0
-    key = paramiko.RSAKey.from_private_key_file("~/.ssh/"keyname)
+    key = paramiko.RSAKey.from_private_key_file("~/.ssh/" + keyname)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
