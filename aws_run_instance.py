@@ -8,7 +8,7 @@ import crypt
 
 port = 8080
 ami_id = 'ami-3e713f4d'
-keyname = 'bogdan'
+keyname = 'yourkey.pem'
 instance_type = 't2.micro'
 
 ec2 = boto3.resource('ec2')
@@ -37,10 +37,10 @@ def adduser(connection,username,password,sudo=False):
 
 def connect(host):
     i = 0
-    key = paramiko.RSAKey.from_private_key_file("/Users/bodzilla/.ssh/bogdan.pem")
+    key = paramiko.RSAKey.from_private_key_file("~/.ssh/"keyname)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    
+
     while True:
         print("Trying to connect to {} ({})".format(host, i))
 
