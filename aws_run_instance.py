@@ -2,18 +2,29 @@
 import sys
 import time
 from flask import Flask, request
-import json, boto3
+import json, boto3, botocore
 import paramiko
 import crypt
 
 port = 8080
-ami_id = 'ami-3e713f4d'
-keyname = 'yourkey.pem'
+ami_id = 'ami-dd3c0f36'
 instance_type = 't2.micro'
+keyname  = 'mykey'
+username = 'centos'
+pkey_file = '~/.ssh/mykey.pem'
 
 ec2 = boto3.resource('ec2')
 
-def createvm(credentials):
+def create_instance():
+    try:
+        sg  = ec2.create_security_group(Description='My Security Group', GroupName='mysg', DryRun=False)
+        sg.authorize_ingress(IpProtocol="tcp",CidrIp="0.0.0.0/0",FromPort=22,ToPort=22)
+        print ("Creating AWS Secury Group to allow SSH access...")
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "InvalidGroup.Duplicate":
+            print ("Security Group already exists.")
+            pass
+    print ("Creating AWS EC2 instance...")
     data = {}
     instance_id = ec2.create_instances(
                         ImageId = ami_id,
@@ -22,9 +33,8 @@ def createvm(credentials):
                         KeyName = keyname,
                         InstanceType = instance_type,
                     )[0].id
-
     instance = ec2.Instance(instance_id)
-    instance.wait_until_running()
+    instance.wait_until_running(Filters=[{'Name': 'instance-state-name', 'Values': ['running',]},],)
     data['instance_id'] = instance_id
     data['instance_ip'] = instance.public_ip_address
     return data
@@ -36,36 +46,20 @@ def adduser(connection,username,password,sudo=False):
     return connection.exec_command(command)
 
 def connect(host):
-    i = 0
-    key = paramiko.RSAKey.from_private_key_file("~/.ssh/" + keyname)
+    key = paramiko.RSAKey.from_private_key_file(pkey_file)
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    while True:
-        print("Trying to connect to {} ({})".format(host, i))
-
-        try:
-            ssh.connect(hostname = host, username = 'ubuntu', pkey = key)
-            print("Connected to {}".format(host))
-            print("Create a user ...".format(host))
-            adduser(ssh, "x1", "xyz123x", sudo=False)
-            break
-        except paramiko.AuthenticationException:
-            print("Authentication failed when connecting to {}".format(host))
-            sys.exit(1)
-        except:
-            print("Could not SSH to {}, waiting for it to start".format(host))
-            i += 1
-            time.sleep(5)
-
-    # If we could not connect within time limit
-        if i == 100:
-            print("Could not connect to {}. Giving up".format(host))
-            sys.exit(1)
+    print ("Connecting to EC2 instance...")
+    time.sleep(30)
+    ssh.connect(hostname = host, username = username, pkey = key)
+    print ("Connection established.")
+    ip = create_instance()
+    print (ip)
+    ssh.close()
 
 app = Flask(__name__)
 
-@app.route('/createvm', methods=['POST'])
+@app.route('/create', methods=['POST'])
 def main():
     if not request.json or not 'username' in request.json or not 'password' in request.json:
         abort(400)
@@ -73,8 +67,8 @@ def main():
         'username': request.json['username'],
         'password': request.json['password'],
     }
-    vm = createvm(credentials)
-    c = connect(vm['instance_ip'])
+    node = create_instance()
+    c = connect(node['instance_ip'])
     return json.dumps(c)
 
 if __name__ == "__main__":
