@@ -62,8 +62,20 @@ def connect(host):
         if i == 100:
             print("Could not connect to {}. Giving up".format(host))
             sys.exit(1)
+    def listinstance(self):
+        for instance in ec2.instances.all():
+            print instance.id, instance.state
+        return self.terminate()
+
+    def terminate(self):
+        for instance_id in sys.argv[1:]:
+            instance = ec2.Instance(instance_id)
+            response = instance.terminate()
+            print response
 
 app = Flask(__name__)
+
+
 
 @app.route('/createvm', methods=['POST'])
 def main():
